@@ -4,7 +4,8 @@ module GeneralBoardFunctions(
     isInputLegal,
     getPieceAtPosition,
     boardPositions,
-    changePieceTo
+    changePieceTo,
+    allPiecesOfCurrentTurn
 )where
 import GeneralGame
 import CoordinateFunctions
@@ -36,6 +37,10 @@ boardPositions'' x mList = (boardYPositions (convFromXCord x) 0 (head mList)) ++
 boardYPositions xcord y [] = []
 boardYPositions xcord y hmList = [[xcord]++[convFromYCord y]]++boardYPositions xcord (y+1) (tail hmList)
 
+allPiecesOfCurrentTurn :: (BoardGame a) => Board a -> Bool -> [String]
+allPiecesOfCurrentTurn currentBoard itsFirstPlayersTurn =
+    filter (\x ->  (getPieceAtPosition currentBoard x) /=empty &&
+                isWhite(getPieceAtPosition currentBoard x) == itsFirstPlayersTurn) (boardPositions currentBoard)
 
 ------------------------
 -- **InputFormating** --
@@ -47,7 +52,6 @@ getInputAndDemandFormat inputBoard = do
     checkInput inputBoard input
 
 checkInput inputBoard "q" = return "q"
-checkInput inputBoard "b" = return "b"
 checkInput inputBoard input
     | isInputLegal inputBoard input = return input
     | otherwise                     = badInputRequestNew inputBoard

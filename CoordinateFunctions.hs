@@ -22,4 +22,5 @@ modifyCoordinate :: Coordinate -> Int -> Int -> Coordinate
 modifyCoordinate coordinate modx mody = [convFromXCord $ (convToXCord coordinate)+modx] ++
                                         [convFromYCord $ (convToYCord coordinate)+mody]
 
+middleCoordinate :: String -> String -> String
 middleCoordinate coord1 coord2 = convFromCord (quot (convToXCord coord1 + convToXCord coord2) 2) (quot (convToYCord coord1 + convToYCord coord2) 2)

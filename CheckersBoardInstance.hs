@@ -51,9 +51,16 @@ startBoard'' = Board [[Empty, Man white, Empty, Man white, Empty, Man white, Emp
                       [Empty, Man black, Empty, Man black, Empty, Man black, Empty, Man black],
                       [Man black, Empty, Man black, Empty, Man black, Empty, Man black, Empty]]
 ---------
-gameIsATie'' currentBoard = False
-currentPlayerHasWon'' currentBoard = False
+
+gameIsATie''  currentBoard = False
 aiMovement currentBoard isFirstPlayersTurn aiMove = return currentBoard
+--------------------
+-- **Tie Game**   --
+--------------------
+
+currentPlayerHasWon'' currentBoard = allPiecesOfCurrentTurn currentBoard True == [] ||
+                            allPiecesOfCurrentTurn currentBoard False == []
+
 --------------------
 -- **MovePieces** --
 --------------------
@@ -82,9 +89,6 @@ movePieceTo movePiece currentBoard isFirstPlayersTurn = do
     moveTo <- getInputAndDemandFormat currentBoard
     movePieceToInput moveTo movePiece currentBoard isFirstPlayersTurn
 
-movePieceToInput "b" _ currentBoard isFirstPlayersTurn = do
-    putStrLn "Choose which piece to move:"
-    playerMovePiece currentBoard isFirstPlayersTurn
 movePieceToInput "q" _ _ _ = return deadBoard
 movePieceToInput moveTo movePiece currentBoard isFirstPlayersTurn
     | elem moveTo (legalMovesForPiece movePiece currentBoard isFirstPlayersTurn) == False
@@ -95,54 +99,76 @@ movePieceToInput moveTo movePiece currentBoard isFirstPlayersTurn
             = do
                 let newTempBoard = changePieceTo currentBoard moveTo (getPieceAtPosition currentBoard movePiece)
                 let newBoard = changePieceTo newTempBoard movePiece empty
-                return newBoard -----FORCE TO MOVE AGAIN????
+                let lastBoard = promoteToKing newBoard moveTo isFirstPlayersTurn
+                return newBoard
     | otherwise
             = do
-                putStrLn "BBBB"
                 let newTempBoard = changePieceTo currentBoard moveTo (getPieceAtPosition currentBoard movePiece)
-                let newTempBoard'' = changePieceTo currentBoard (middleCoordinate moveTo movePiece) empty
+                let newTempBoard'' = changePieceTo newTempBoard (middleCoordinate moveTo movePiece) empty
                 let newBoard = changePieceTo newTempBoard'' movePiece empty
-                return newBoard -----FORCE TO MOVE AGAIN????
+                let lastBoard = promoteToKing newBoard moveTo isFirstPlayersTurn
+                if (takeMovesFromPosition lastBoard moveTo isFirstPlayersTurn == []) then
+                        do return lastBoard
+                    else do
+                        printBoard lastBoard
+                        putStrLn "New take move possible. Move to position: "
+                        movePieceTo moveTo lastBoard isFirstPlayersTurn
 
 
+----- King
 
+promoteToKing currentBoard moveTo isFirstPlayersTurn
+    | isFirstPlayersTurn && yCord== 7   = changePieceTo currentBoard moveTo (King isFirstPlayersTurn)
+    | yCord == 0                        = changePieceTo currentBoard moveTo (King isFirstPlayersTurn)
+    | otherwise                         = currentBoard
+    where
+        xCord = convToYCord(moveTo)
 -- Pieces On The Board --
 --emptyBoardPositions
-legalMovesForPiece :: Coordinate -> Board Checkers -> IsWhite -> [Coordinate]
-legalMovesForPiece coordinate currentBoard isFirstPlayersTurn = plainLegalMoves currentBoard coordinate----- CHANGE THIS
 
-
+-- First called when we want to start moving
 positionsWithMovablePieces :: Board Checkers -> IsWhite -> [String]
-positionsWithMovablePieces (Board mList) itsFirstPlayersTurn = filter (isPieceMovable mList itsFirstPlayersTurn) (boardPositions (Board mList))
+positionsWithMovablePieces (Board mList) itsFirstPlayersTurn
+    | takeMovesTotal /= [] = takeMovesTotal
+    | otherwise            = filter (isPieceMovable mList itsFirstPlayersTurn) (boardPositions (Board mList))
+    where
+        takeMovesTotal = piecesWithTakeMoves (Board mList) itsFirstPlayersTurn
+
+legalMovesForPiece :: Coordinate -> Board Checkers -> IsWhite -> [Coordinate]
+legalMovesForPiece coordinate currentBoard isFirstPlayersTurn
+    | takemoves /= [] = takemoves
+    | otherwise       = plainLegalMoves currentBoard coordinate
+    where
+        takemoves = takeMovesFromPosition currentBoard coordinate isFirstPlayersTurn
 
 isPieceMovable mList itsFirstPlayersTurn coordinate =
     let piece = getPieceAtPosition (Board mList) coordinate
         in piece /= Empty &&
-           isWhite piece == itsFirstPlayersTurn
+           isWhite piece == itsFirstPlayersTurn &&
+           legalMovesForPiece coordinate (Board mList) itsFirstPlayersTurn /= []
 
 
---normalLegalMovesOnBoard :: Board Checkers ->
 plainLegalMoves inBoard coordinate =
     filter (\x -> elem x (emptyPositions inBoard)) (generalPiecePossibleMoves (getPieceAtPosition inBoard coordinate) coordinate)
 
 generalPiecePossibleMoves :: Checkers -> (Coordinate -> [Coordinate])
-generalPiecePossibleMoves piece coordinate
-    | piece == Man True                   =[modifyCoordinate coordinate (1) (1), modifyCoordinate coordinate (-1) (1)]
-    | piece == Man False                  =[modifyCoordinate coordinate (1) (-1), modifyCoordinate coordinate (-1) (-1)]
-    | piece /= Empty                      =[modifyCoordinate coordinate (-1) (-1), modifyCoordinate coordinate (-1) (1),
-                                            modifyCoordinate coordinate (1) (-1), modifyCoordinate coordinate (1) (1) ]
+generalPiecePossibleMoves piece coordinate = piecePossibleMoves piece coordinate 1
 
-{-
-
-
-getStartPos
-ifNotQOrBad  then getEndPos
-ifAllowedEndPos(forcedTake?) modifyBoard then lookIfMovedPieceHasMoreTakes
+piecePossibleMoves piece coordinate i
+    | piece == Man True                   =[modifyCoordinate coordinate (i) (i), modifyCoordinate coordinate (-i) (i)]
+    | piece == Man False                  =[modifyCoordinate coordinate (i) (-i), modifyCoordinate coordinate (-i) (-i)]
+    | piece /= Empty                      =[modifyCoordinate coordinate (-i) (-i), modifyCoordinate coordinate (-i) i,
+                                            modifyCoordinate coordinate (i) (-i), modifyCoordinate coordinate (i) (i) ]
 
 
+piecesWithTakeMoves currentBoard itsFirstPlayersTurn =
+    filter (\x -> takeMovesFromPosition currentBoard x itsFirstPlayersTurn /=[]) (allPiecesOfCurrentTurn currentBoard itsFirstPlayersTurn)
 
---------------------
--- **PrintBoard** --
---------------------
+takeMovesFromPosition inBoard coordinate itsFirstPlayersTurn=
+        filter (\x -> (elem x (emptyPositions inBoard)) &&
+                    getPieceAtPosition inBoard (middleCoordinate x coordinate) /= Empty &&
+                    isWhite (getPieceAtPosition inBoard (middleCoordinate x coordinate)) /= itsFirstPlayersTurn)
+            (takePiecePossibleMoves (getPieceAtPosition inBoard coordinate) coordinate)
+takePiecePossibleMoves :: Checkers -> Coordinate -> [Coordinate]
+takePiecePossibleMoves piece coordinate = piecePossibleMoves piece coordinate 2
 
--}
